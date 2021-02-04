@@ -22,38 +22,38 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   var slug;
-  @override
-  Widget build(BuildContext context) {
-    void initDynamicLinks() async {
-      FirebaseDynamicLinks.instance.onLink(
-          onSuccess: (PendingDynamicLinkData dynamicLink) async {
-        final Uri deepLink = dynamicLink?.link;
+  void initState() {
+    super.initState();
+    initDynamicLinks();
+  }
 
-        if (deepLink != null) {
-          Navigator.pushNamed(context, "prodct-detail-page2");
-          slug = deepLink.path;
-        }
-      }, onError: (OnLinkErrorException e) async {
-        print('onLinkError');
-        print(e.message);
-      });
-
-      final PendingDynamicLinkData data =
-          await FirebaseDynamicLinks.instance.getInitialLink();
-      final Uri deepLink = data?.link;
+  void initDynamicLinks() async {
+    FirebaseDynamicLinks.instance.onLink(
+        onSuccess: (PendingDynamicLinkData dynamicLink) async {
+      final Uri deepLink = dynamicLink?.link;
 
       if (deepLink != null) {
         Navigator.pushNamed(context, "prodct-detail-page2");
         slug = deepLink.path;
+      } else {
+        print("Something is Wrong");
       }
-    }
+    }, onError: (OnLinkErrorException e) async {
+      print('onLinkError');
+      print(e.message);
+    });
 
-    @override
-    void initState() {
-      super.initState();
-      initDynamicLinks();
-    }
+    final PendingDynamicLinkData data =
+        await FirebaseDynamicLinks.instance.getInitialLink();
+    final Uri deepLink = data?.link;
 
+    if (deepLink != null) {
+      Navigator.pushNamed(context, "prodct-detail-page2");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp(
       initialRoute: "home",
       routes: {

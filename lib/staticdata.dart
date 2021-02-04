@@ -27,6 +27,8 @@ final verifyCustomerOtpApi = baseUrl + "customer-verify-otp";
 final changePasswordApi = baseUrl + "change-password";
 final cityListApi = baseUrl + "city-list";
 final brandListApi = baseUrl + "brand-list";
+final itemDetails = baseUrl + "item-details";
+final dynamicLink = baseUrl + "dynamic-link";
 var profileData;
 var token = "";
 var usernameData;

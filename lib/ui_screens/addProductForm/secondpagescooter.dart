@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_absolute_path/flutter_absolute_path.dart';
@@ -36,6 +37,11 @@ class _CategoryPageAddSecondScooterState
   int engine = 0;
   var offered_price;
   var km;
+  var slug;
+  bool _isCreatingLink;
+  var _linkMessage;
+
+  var _url;
 
   GlobalKey<ScaffoldState> scaffoldKey = GlobalKey();
   String postStatus = "Add Product";
@@ -246,8 +252,41 @@ class _CategoryPageAddSecondScooterState
     return Directory.systemTemp;
   }
 
+  Future<void> _createDynamicLink(bool short) async {
+    setState(() {
+      _isCreatingLink = true;
+    });
+
+    final DynamicLinkParameters parameters = DynamicLinkParameters(
+      uriPrefix: 'https://app.sec2hand.com/',
+      link: Uri.parse('https://www.sec2hand.com/$slug'),
+      androidParameters: AndroidParameters(
+        packageName: 'com.lohitbura.sec2hand',
+        minimumVersion: 0,
+      ),
+      dynamicLinkParametersOptions: DynamicLinkParametersOptions(
+        shortDynamicLinkPathLength: ShortDynamicLinkPathLength.short,
+      ),
+    );
+
+    //Uri url;
+    if (short) {
+      final ShortDynamicLink shortLink = await parameters.buildShortLink();
+      _url = shortLink.shortUrl;
+    } else {
+      _url = await parameters.buildUrl();
+    }
+
+    setState(() {
+      _linkMessage = _url.toString();
+      _isCreatingLink = false;
+    });
+    print(_linkMessage);
+    print(_url);
+  }
+
   void postPic() async {
-    Response response;
+    Response response1;
     List images = [];
     List image_Bill = [];
     var tmpDir = (await getTemporaryDirectory()).path;
@@ -267,50 +306,69 @@ class _CategoryPageAddSecondScooterState
       var img = await MultipartFile.fromFile(newPath, filename: newPath);
       image_Bill.add(img);
     }
-    FormData formData;
+    FormData formData1;
     String url;
     try {
       if (true) {
-        formData = FormData.fromMap({
-          "model": model,
-          "price": offered_price,
-          "date-of-purchage": selectedDateofpurchage,
-          "brand": brand,
-          "insurence": insurance,
+        formData1 = FormData.fromMap({
+          // "date-of-purchage": selectedDateofpurchage,
+
           "insurence-valid-till": selectedDateofvalidinsurence,
           "offered-price": offered_price,
+
+          "model": model,
+          "price": offered_price,
+          //"date-of-purchage": selectedDateofpurchage,
+          "brand": brand,
+          "insurance": insurance,
+          "insurance_date": selectedDateofvalidinsurence,
+
           "fuel-type": _fuelType,
           "state": state,
-          "total-km-car-has-run": km,
-          "hypothecation": hypothecation,
-          "register-transfer": registration_Transfer,
-          "no-of-owners": no_of_owners,
+          "km": km,
+          "hypothetication": hypothecation,
+          "registeration-transfer": registration_Transfer,
+          "ownership_state": no_of_owners,
           "service-history": service_history,
-          "body-rating": body,
-          "engine-rating": engine
+          "body-rate": body,
+          "engine-rate": engine
         });
         url = bikeAddApi;
       }
       for (int i = 0; i < images.length; i++) {
-        formData.files.addAll([MapEntry("images", images[i])]);
+        formData1.files.addAll([MapEntry("images", images[i])]);
       }
       for (int i = 0; i < image_Bill.length; i++) {
-        formData.files.addAll([MapEntry("image_bill", image_Bill[i])]);
+        formData1.files.addAll([MapEntry("image_bill", image_Bill[i])]);
       }
-      response = await dio.post(url,
-          data: formData,
+      response1 = await dio.post(url,
+          data: formData1,
           options: Options(
             contentType: 'application/json',
             headers: {HttpHeaders.authorizationHeader: "Token " + token},
           ));
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response1.statusCode == 200 || response1.statusCode == 201) {
         var profileResponse = await dio.get(profileApi,
             options: Options(
               contentType: 'application/json',
               headers: {HttpHeaders.authorizationHeader: "Token " + token},
             ));
         profileData = profileResponse.data;
+        slug = response1.data["slug"];
+        var category = response1.data["category"];
+
+        FormData formData2;
+        // ignore: unused_local_variable
+        Response response2;
+        formData2 = FormData.fromMap(
+            {"dynamic-link": url, "category": category, "slug": slug});
+        response2 = await dio.post(dynamicLink,
+            data: formData2,
+            options: Options(
+              contentType: 'application/json',
+              headers: {HttpHeaders.authorizationHeader: "Token " + token},
+            ));
 
         final snackBar = SnackBar(
           content: Text('Product added Successfully'),

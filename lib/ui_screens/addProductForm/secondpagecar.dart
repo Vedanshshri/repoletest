@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_absolute_path/flutter_absolute_path.dart';
@@ -37,6 +38,11 @@ class _CategoryPageAddSecondCarState extends State<CategoryPageAddSecondCar> {
   String transmission = "Mannual";
   var offered_price;
   var km;
+  var slug;
+  bool _isCreatingLink;
+  var _linkMessage;
+
+  var _url;
 
   GlobalKey<ScaffoldState> scaffoldKey = GlobalKey();
   String postStatus = "Add Product";
@@ -246,8 +252,45 @@ class _CategoryPageAddSecondCarState extends State<CategoryPageAddSecondCar> {
     return Directory.systemTemp;
   }
 
+  Future<void> _createDynamicLink(bool short) async {
+    setState(() {
+      _isCreatingLink = true;
+    });
+
+    final DynamicLinkParameters parameters = DynamicLinkParameters(
+      uriPrefix: 'https://app.sec2hand.com/',
+      link: Uri.parse('https://www.sec2hand.com/$slug'),
+      androidParameters: AndroidParameters(
+        packageName: 'com.lohitbura.sec2hand',
+        minimumVersion: 0,
+      ),
+      dynamicLinkParametersOptions: DynamicLinkParametersOptions(
+        shortDynamicLinkPathLength: ShortDynamicLinkPathLength.short,
+      ),
+      iosParameters: IosParameters(
+        bundleId: 'com.google.FirebaseCppDynamicLinksTestApp.dev',
+        minimumVersion: '0',
+      ),
+    );
+
+    //Uri url;
+    if (short) {
+      final ShortDynamicLink shortLink = await parameters.buildShortLink();
+      _url = shortLink.shortUrl;
+    } else {
+      _url = await parameters.buildUrl();
+    }
+
+    setState(() {
+      _linkMessage = _url.toString();
+      _isCreatingLink = false;
+    });
+    print(_linkMessage);
+    print(_url);
+  }
+
   void postPic() async {
-    Response response;
+    Response response1;
     List images = [];
     List image_Bill = [];
     var tmpDir = (await getTemporaryDirectory()).path;
@@ -267,57 +310,74 @@ class _CategoryPageAddSecondCarState extends State<CategoryPageAddSecondCar> {
       var img = await MultipartFile.fromFile(newPath, filename: newPath);
       image_Bill.add(img);
     }
-    FormData formData;
-    String url;
+    FormData formData1;
+
     try {
       if (true) {
-        formData = FormData.fromMap({
+        formData1 = FormData.fromMap({
           "model": model,
           "price": offered_price,
-          "date-of-purchage": selectedDateofpurchage,
+          //"date-of-purchage": selectedDateofpurchage,
           "brand": brand,
-          "insurence": insurance,
-          "insurence-valid-till": selectedDateofvalidinsurence,
-          "offered-price": offered_price,
+          "insurance": insurance,
+          "insurance_date": selectedDateofvalidinsurence,
+
           "fuel-type": _fuelType,
           "transmission": transmission,
           "state": state,
-          "total-km-car-has-run": km,
-          "hypothecation": hypothecation,
-          "register-transfer": registration_Transfer,
-          "no-of-owners": no_of_owners,
+          "km": km,
+          "hypothetication": hypothecation,
+          "registertion-transfer": registration_Transfer,
+          "ownership_state": no_of_owners,
           "service-history": service_history,
-          "exterior-rating": exterior,
-          "interior-rating": interior,
-          "engine-rating": engine
+          "exterior-rate": exterior,
+          "interior-rate": interior,
+          "engine-rate": engine
         });
-        url = carAddApi;
       }
       for (int i = 0; i < images.length; i++) {
-        formData.files.addAll([MapEntry("images", images[i])]);
+        formData1.files.addAll([MapEntry("images", images[i])]);
       }
       for (int i = 0; i < image_Bill.length; i++) {
-        formData.files.addAll([MapEntry("image_bill", image_Bill[i])]);
+        formData1.files.addAll([MapEntry("image_bill", image_Bill[i])]);
       }
-      response = await dio.post(url,
-          data: formData,
+      response1 = await dio.post(carAddApi,
+          data: formData1,
           options: Options(
             contentType: 'application/json',
             headers: {HttpHeaders.authorizationHeader: "Token " + token},
           ));
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response1.statusCode == 200 || response1.statusCode == 201) {
         var profileResponse = await dio.get(profileApi,
             options: Options(
               contentType: 'application/json',
               headers: {HttpHeaders.authorizationHeader: "Token " + token},
             ));
         profileData = profileResponse.data;
+        _createDynamicLink(false);
 
-        final snackBar = SnackBar(
+        FormData formData2;
+        slug = response1.data["slug"];
+        var category = response1.data["category"];
+        // ignore: unused_local_variable
+        Response response2;
+        formData2 = FormData.fromMap({
+          "dynamic_link": _url,
+          "category": category,
+          "slug": slug,
+        });
+        response2 = await dio.post(dynamicLink,
+            data: formData2,
+            options: Options(
+              contentType: 'application/json',
+              headers: {HttpHeaders.authorizationHeader: "Token " + token},
+            ));
+
+        /* final snackBar = SnackBar(
           content: Text('Product added Successfully'),
         );
-        scaffoldKey.currentState.showSnackBar(snackBar);
+        scaffoldKey.currentState.showSnackBar(snackBar);*/
 
         Navigator.of(context)
             .pushReplacement(MaterialPageRoute(builder: (context) => Menu(1)));

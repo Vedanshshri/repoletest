@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:dio/dio.dart';
+import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_absolute_path/flutter_absolute_path.dart';
@@ -23,8 +24,8 @@ class CategoryPageAddSecond extends StatefulWidget {
 
 class _CategoryPageAddSecondState extends State<CategoryPageAddSecond> {
   String brand;
-  String ram = '1 GB';
-  String rom = '1 GB';
+  String ram = '1';
+  String rom = '1';
   String os = 'Android';
   var battery_capacity;
   String charger = "No";
@@ -34,6 +35,10 @@ class _CategoryPageAddSecondState extends State<CategoryPageAddSecond> {
   var battery = 0;
   String insurence = "No";
   var offered_price;
+  bool _isCreatingLink;
+  var _linkMessage;
+  var slug;
+  var _url;
 
   Dio dio = new Dio();
   var picker = ImagePicker();
@@ -236,9 +241,6 @@ class _CategoryPageAddSecondState extends State<CategoryPageAddSecond> {
       quality: 50,
     );
 
-    print(file.lengthSync());
-    print(result.lengthSync());
-
     return result;
   }
 
@@ -246,8 +248,41 @@ class _CategoryPageAddSecondState extends State<CategoryPageAddSecond> {
     return Directory.systemTemp;
   }
 
+  Future<void> _createDynamicLink(bool short) async {
+    setState(() {
+      _isCreatingLink = true;
+    });
+
+    final DynamicLinkParameters parameters = DynamicLinkParameters(
+      uriPrefix: 'https://app.sec2hand.com/',
+      link: Uri.parse('https://www.sec2hand.com/$slug'),
+      androidParameters: AndroidParameters(
+        packageName: 'com.lohitbura.sec2hand',
+        minimumVersion: 0,
+      ),
+      dynamicLinkParametersOptions: DynamicLinkParametersOptions(
+        shortDynamicLinkPathLength: ShortDynamicLinkPathLength.short,
+      ),
+    );
+
+    //Uri url;
+    if (short) {
+      final ShortDynamicLink shortLink = await parameters.buildShortLink();
+      _url = shortLink.shortUrl;
+    } else {
+      _url = await parameters.buildUrl();
+    }
+
+    setState(() {
+      _linkMessage = _url.toString();
+      _isCreatingLink = false;
+    });
+    print(_linkMessage);
+    print(_url);
+  }
+
   void postPic() async {
-    Response response;
+    Response response1;
     List images = [];
     List image_Bill = [];
     var tmpDir = (await getTemporaryDirectory()).path;
@@ -267,69 +302,84 @@ class _CategoryPageAddSecondState extends State<CategoryPageAddSecond> {
       var img = await MultipartFile.fromFile(newPath, filename: newPath);
       image_Bill.add(img);
     }
-    FormData formData;
-    String url;
-    try {
-      if (true) {
-        formData = FormData.fromMap({
-          "model": model,
-          "price": offered_price,
-          "date-of-purchage": selectedDateofpurchage,
-          "brand": brand,
-          "ram": ram,
-          "rom": rom,
-          "battery_capacity": battery_capacity,
-          "insurence": insurence,
-          "operating_system": os,
-          "camera_rating": camera,
-          "battery_rating": battery,
-          "display_rating": display,
-          "body_rating": body,
-          "charger_included": charger,
-          "insurence-valid-till": selectedDateofvalidinsurence,
-          "offered-price": offered_price
-        });
-        url = mobileAddApi;
-      }
-      for (int i = 0; i < images.length; i++) {
-        formData.files.addAll([MapEntry("images", images[i])]);
-      }
-      for (int i = 0; i < image_Bill.length; i++) {
-        formData.files.addAll([MapEntry("image_bill", image_Bill[i])]);
-      }
-      response = await dio.post(url,
-          data: formData,
+    FormData formData1;
+
+    formData1 = FormData.fromMap({
+      "model": model,
+      "brand": brand,
+      "price": offered_price,
+      //"date_of_purchage": selectedDateofpurchage,
+      //  "ram": ram,
+      //  "rom": rom,
+      "battery": battery_capacity,
+      "insurance": insurence,
+      "operating_system": os,
+      "camera_rate": camera,
+      "battery_rate": battery,
+      "display_rate": display,
+      "body_rate": body,
+      "charger_included": charger,
+      "insurance_date": selectedDateofvalidinsurence,
+    });
+
+    /*for (int i = 0; i < images.length; i++) {
+      formData1.files.addAll([MapEntry("image", images[i])]);
+    }*/
+    /* for (int i = 0; i < image_Bill.length; i++) {
+        formData1.files.addAll([MapEntry("image_bill", image_Bill[i])]);
+      }*/
+    response1 = await dio.post(mobileAddApi,
+        data: formData1,
+        options: Options(
+          contentType: 'application/json',
+          headers: {HttpHeaders.authorizationHeader: "Token " + token},
+        ));
+
+    if (response1.statusCode == 200 || response1.statusCode == 201) {
+      var profileResponse = await dio.get(profileApi,
           options: Options(
             contentType: 'application/json',
             headers: {HttpHeaders.authorizationHeader: "Token " + token},
           ));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        var profileResponse = await dio.get(profileApi,
+      profileData = profileResponse.data;
+      slug = response1.data["slug"];
+      var category = response1.data["category"];
+      _createDynamicLink(false);
+      FormData formData2;
+      // ignore: unused_local_variable
+      Response response2;
+      if (_url != null) {
+        formData2 = FormData.fromMap({
+          "dynamic_link": _url,
+          "category": category,
+          "slug": slug,
+        });
+        response2 = await dio.post(dynamicLink,
+            data: formData2,
             options: Options(
               contentType: 'application/json',
               headers: {HttpHeaders.authorizationHeader: "Token " + token},
             ));
-        profileData = profileResponse.data;
-
-        final snackBar = SnackBar(
-          content: Text('Product added Successfully'),
-        );
-        scaffoldKey.currentState.showSnackBar(snackBar);
-
-        Navigator.of(context)
-            .pushReplacement(MaterialPageRoute(builder: (context) => Menu(1)));
-      } else {
-        setState(() {
-          postStatus = "Add Product";
-        });
-
-        final snackBar = SnackBar(
-          content: Text('Something went wrong...'),
-        );
-        scaffoldKey.currentState.showSnackBar(snackBar);
       }
-    } catch (e) {
+
+      // final snackBar = SnackBar(
+      // content: Text('Product added Successfully'),
+      // );
+      //  scaffoldKey.currentState.showSnackBar(snackBar);
+
+      // Navigator.of(context)
+      //   .pushReplacement(MaterialPageRoute(builder: (context) => Menu(1)));
+    } else {
+      setState(() {
+        postStatus = "Add Product";
+      });
+
+      final snackBar = SnackBar(
+        content: Text('Something went wrong...'),
+      );
+      scaffoldKey.currentState.showSnackBar(snackBar);
+    }
+    /*} catch (e) {
       setState(() {
         postStatus = "Add Product";
       });
@@ -338,7 +388,8 @@ class _CategoryPageAddSecondState extends State<CategoryPageAddSecond> {
         content: Text(e.toString()),
       );
       scaffoldKey.currentState.showSnackBar(snackBar);
-    }
+      print("something is wrong");
+    }*/
   }
 
   @override
@@ -376,6 +427,11 @@ class _CategoryPageAddSecondState extends State<CategoryPageAddSecond> {
           ],
         ),
         appBar: AppBar(
+          actions: [
+            IconButton(
+                icon: Icon(Icons.ac_unit),
+                onPressed: () => _createDynamicLink(false))
+          ],
           title: Text("Fill the Details"),
         ),
         //backgroundColor: Colors.lightBlue.shade500,
@@ -580,14 +636,14 @@ class _CategoryPageAddSecondState extends State<CategoryPageAddSecond> {
                                         });
                                       },
                                       items: [
-                                        "1 GB",
-                                        "2 GB",
-                                        '3 GB',
-                                        '4 GB',
-                                        '5 GB',
-                                        '6 GB',
-                                        '7 GB',
-                                        '8 GB'
+                                        "1",
+                                        "2",
+                                        '3',
+                                        '4',
+                                        '5',
+                                        '6',
+                                        '7',
+                                        '8'
                                       ].map<DropdownMenuItem<String>>(
                                           (String value) {
                                         return DropdownMenuItem<String>(
@@ -651,14 +707,14 @@ class _CategoryPageAddSecondState extends State<CategoryPageAddSecond> {
                                         });
                                       },
                                       items: [
-                                        "1 GB",
-                                        "2 GB",
-                                        '3 GB',
-                                        '4 GB',
-                                        '5 GB',
-                                        '6 GB',
-                                        '7 GB',
-                                        '8 GB'
+                                        "1",
+                                        "2",
+                                        '3',
+                                        '4',
+                                        '5',
+                                        '6',
+                                        '7',
+                                        '8',
                                       ].map<DropdownMenuItem<String>>(
                                           (String value) {
                                         return DropdownMenuItem<String>(

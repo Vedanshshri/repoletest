@@ -43,6 +43,11 @@ dependencies:
   url_launcher_platform_interface: ^1.0.9
   share: ^0.6.5+4
   geolocator: ^6.1.13
+  firebase_dynamic_links: ^0.7.0+1
+  firebase_analytics: ^7.0.1
+  firebase_core: ^0.7.0
+  firebase_core_platform_interface: ^3.0.1
+
 
 
 dev_dependencies:
